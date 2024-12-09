@@ -1,81 +1,96 @@
-const express = require('express');
-const { Pool } = require('pg');
-require('dotenv').config();
+const express = require("express");
+const { Pool } = require("pg");
+require("dotenv").config();
 
 const app = express();
-const port = process.env.PORT || 3000;
-
-// Configuração do pool de conexão com o PostgreSQL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-
-// Middleware para interpretar JSON
 app.use(express.json());
 
-// Rota de teste
-app.get('/', (req, res) => {
-  res.send('API de Currículos está funcionando!');
+// Configuração do banco de dados
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // Ajuste para Render
 });
 
-// CREATE - Adicionar novo currículo
-app.post('/curriculos', async (req, res) => {
-  const { nome, email, telefone, habilidades } = req.body;
+// Rota para criar um currículo (POST)
+app.post("/curriculos", async (req, res) => {
+  const { nome, email, telefone, experiencia, habilidades } = req.body;
+
+  if (!nome || !email || !telefone || !experiencia || !habilidades) {
+    return res.status(400).json({ error: "Todos os campos são obrigatórios." });
+  }
+
   try {
     const result = await pool.query(
-      'INSERT INTO curriculos (nome, email, telefone, habilidades) VALUES ($1, $2, $3, $4) RETURNING *',
-      [nome, email, telefone, habilidades]
+      "INSERT INTO curriculos (nome, email, telefone, experiencia, habilidades) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+      [nome, email, telefone, experiencia, habilidades]
     );
     res.status(201).json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao criar currículo" });
   }
 });
 
-// READ - Obter todos os currículos
-app.get('/curriculos', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM curriculos');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// UPDATE - Atualizar currículo por ID
-app.put('/curriculos/:id', async (req, res) => {
+// Rota para atualizar um currículo (PUT)
+app.put("/curriculos/:id", async (req, res) => {
   const { id } = req.params;
-  const { nome, email, telefone, habilidades } = req.body;
+  const { nome, email, telefone, experiencia, habilidades } = req.body;
+
+  if (!nome || !email || !telefone || !experiencia || !habilidades) {
+    return res.status(400).json({ error: "Todos os campos são obrigatórios." });
+  }
+
   try {
     const result = await pool.query(
-      'UPDATE curriculos SET nome = $1, email = $2, telefone = $3, habilidades = $4 WHERE id = $5 RETURNING *',
-      [nome, email, telefone, habilidades, id]
+      "UPDATE curriculos SET nome = $1, email = $2, telefone = $3, experiencia = $4, habilidades = $5 WHERE id = $6 RETURNING *",
+      [nome, email, telefone, experiencia, habilidades, id]
     );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Currículo não encontrado' });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Currículo não encontrado." });
     }
-    res.json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    res.status(200).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao atualizar currículo" });
   }
 });
 
-// DELETE - Remover currículo por ID
-app.delete('/curriculos/:id', async (req, res) => {
-  const { id } = req.params;
+// Rota para obter todos os currículos (GET)
+app.get("/curriculos", async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM curriculos WHERE id = $1', [id]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Currículo não encontrado' });
-    }
-    res.json({ message: 'Currículo removido com sucesso' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const result = await pool.query("SELECT * FROM curriculos");
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao buscar currículos" });
   }
 });
 
-// Iniciar o servidor
-app.listen(port, () => {
-  console.log(`Servidor rodando em:${port}`);
+// Rota para deletar um currículo (DELETE)
+app.delete("/curriculos/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      "DELETE FROM curriculos WHERE id = $1 RETURNING *",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Currículo não encontrado." });
+    }
+
+    res.status(200).json({ message: "Currículo deletado com sucesso." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Erro ao deletar currículo" });
+  }
+});
+
+// Inicialização do servidor
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
